@@ -24,6 +24,9 @@ export default class NewClass extends cc.Component {
     @property(cc.Node)
     heroNode: cc.Node = null;
 
+    @property(cc.Node)
+    opponentNode: cc.Node = null;
+
     @property
     userID: number = 0;
 
@@ -32,6 +35,8 @@ export default class NewClass extends cc.Component {
 
     onLoad () {
         cc.systemEvent.on(cc.SystemEvent.EventType.KEY_DOWN, this.onKeyDown, this);
+        this.initHero();
+        this.opponentNode.active = false;
     }
 
     start () {
@@ -54,8 +59,15 @@ export default class NewClass extends cc.Component {
         this.sfs.addEventListener(SFS2X.SFSEvent.ROOM_JOIN, this.onLobbyConnect, this);
         this.sfs.addEventListener(SFS2X.SFSEvent.ROOM_JOIN_ERROR, this.onRoomConnectError, this);
         this.sfs.addEventListener(SFS2X.SFSEvent.PUBLIC_MESSAGE, this.onPublicMessage, this);
+        this.sfs.addEventListener(SFS2X.SFSEvent.USER_ENTER_ROOM, this.onUserEnterRoom, this);
+        this.sfs.addEventListener(SFS2X.SFSEvent.USER_EXIT_ROOM, this.onUserExitRoom, this);
 
         this.sfs.connect();
+    }
+
+    public initHero() {
+        this.heroNode.x = 100 + Math.floor(Math.random() * 200);
+        this.heroNode.y = 100 + Math.floor(Math.random() * 200);  
     }
 
     public onConnect(event) {
@@ -81,11 +93,32 @@ export default class NewClass extends cc.Component {
 
     public onLobbyConnect(event) {
         cc.log('asdfasdfd');
-        // now user can communicate with others
+
+        // Check if opponent existed or not
+        if (this.sfs.userManager.getUserCount() > 1) {
+            this.opponentNode.active = true;
+        }
+
+        // Tell opponent my pos
+        this.broadcastUserInfo(this.heroNode.x, this.heroNode.y);
     }
 
     public onRoomConnectError(event) {
         cc.log('asdfasf');
+    }
+
+    public onUserEnterRoom(event) {
+        cc.log('sdfasfsaf');
+
+        // Add opponent
+        this.opponentNode.active = true;
+    }
+
+    public onUserExitRoom(event) {
+        cc.log('asdfsadf');
+
+        // Remove opponent
+        this.opponentNode.active = false;
     }
 
     public onKeyDown(event) {
@@ -110,18 +143,32 @@ export default class NewClass extends cc.Component {
         var sender = (event.sender.isItMe ? "You" : event.sender.name);
         var nick = event.sender.getVariable("nick");
         var aka = (!event.sender.isItMe && nick != null ? " (aka '" + nick.value + "')" : "");
+
+        if (!event.sender.isItMe) {
+            this.updateOpponentInfo(data);
+        }
     }
 
     public moveHeroLeft() {
         this.heroNode.x -= 10;
-
-        var info = new SFS2X.SFSObject();
-        info.putFloat('x', this.heroNode.x);
-        info.putFloat('y', this.heroNode.y);
-        var isSent = this.sfs.send(new SFS2X.PublicMessageRequest('[msg] Move Left', info));
+        this.broadcastUserInfo(this.heroNode.x, this.heroNode.y);
     }
 
     public moveHeroRight() {
         this.heroNode.x += 10;
+        this.broadcastUserInfo(this.heroNode.x, this.heroNode.y);
+    }
+
+    public broadcastUserInfo(x: number, y: number) {
+        var info = new SFS2X.SFSObject();
+        info.putFloat('x', x);
+        info.putFloat('y', y);
+        var isSent = this.sfs.send(new SFS2X.PublicMessageRequest('[msg] Move', info));
+    }
+
+    public updateOpponentInfo(data: SFS2X.SFSObject) {   
+        var x = data.getFloat('x');
+        var y = data.getFloat('y');    
+        this.opponentNode.setPosition(x , y);
     }
 }
